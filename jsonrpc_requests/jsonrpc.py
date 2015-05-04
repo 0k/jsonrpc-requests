@@ -18,6 +18,10 @@ class ProtocolError(JSONRPCError):
     """An error occurred while dealing with the JSON-RPC protocol"""
 
 
+class ApplicativeError(JSONRPCError):
+    """A valid JSON-RPC error was returned by the server."""
+
+
 class Server(object):
     """A connection to a HTTP JSON-RPC server, backed by requests"""
 
@@ -44,7 +48,7 @@ class Server(object):
             try:
                 parsed = response.json()
             except ValueError as value_error:
-                raise TransportError('Cannot deserialize response body', value_error)
+                raise ProtocolError('Cannot deserialize response body', value_error)
 
             return self.parse_result(parsed)
 
@@ -56,9 +60,9 @@ class Server(object):
         if result.get('error'):
             code = result['error'].get('code', '')
             message = result['error'].get('message', '')
-            raise ProtocolError(code, message, result)
+            raise ApplicativeError(code, message, result)
         elif 'result' not in result:
-            raise ProtocolError('Response without a result field')
+            raise ProtocolError("Response without a 'result' field")
         else:
             return result['result']
 

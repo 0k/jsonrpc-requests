@@ -9,7 +9,7 @@ import requests
 import requests.exceptions
 import responses
 
-from jsonrpc_requests import Server, ProtocolError, TransportError
+from jsonrpc_requests import Server, ProtocolError, TransportError, ApplicativeError
 
 try:
     # python 3.3
@@ -76,23 +76,23 @@ class TestJSONRPCClient(TestCase):
     def test_parse_result(self):
         with self.assertRaisesRegex(ProtocolError, 'Response is not a dictionary'):
             self.server.parse_result([])
-        with self.assertRaisesRegex(ProtocolError, 'Response without a result field'):
+        with self.assertRaisesRegex(ProtocolError, "Response without a 'result' field"):
             self.server.parse_result({})
-        with self.assertRaises(ProtocolError) as protoerror:
+        with self.assertRaises(ApplicativeError) as applicative_error:
             body = {"jsonrpc": "2.0", "error": {"code": -32601, "message": "Method not found"}, "id": "1"}
             self.server.parse_result(body)
-        self.assertEqual(protoerror.exception.args[0], -32601)
-        self.assertEqual(protoerror.exception.args[1], 'Method not found')
+        self.assertEqual(applicative_error.exception.args[0], -32601)
+        self.assertEqual(applicative_error.exception.args[1], 'Method not found')
 
     @responses.activate
     def test_send_request(self):
         # catch non-json responses
-        with self.assertRaises(TransportError) as transport_error:
+        with self.assertRaises(ProtocolError) as protocol_error:
             responses.add(responses.POST, 'http://mock/xmlrpc', body='not json', content_type='application/json')
             self.server.send_request('my_method', is_notification=False, params=None)
 
-        self.assertEqual(transport_error.exception.args[0], 'Cannot deserialize response body')
-        self.assertIsInstance(transport_error.exception.args[1], ValueError)
+        self.assertEqual(protocol_error.exception.args[0], 'Cannot deserialize response body')
+        self.assertIsInstance(protocol_error.exception.args[1], ValueError)
         responses.reset()
 
         # catch non-200 responses
