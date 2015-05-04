@@ -121,7 +121,7 @@ class TestJSONRPCClient(TestCase):
         with self.assertRaises(TransportError) as transport_error:
             s = Server('http://host-doesnt-exist')
             s.foo()
-        self.assertEqual(transport_error.exception.args[0], 'Error calling method foo')
+        self.assertEqual(transport_error.exception.args[0], "Error calling method 'foo'")
         self.assertIsInstance(transport_error.exception.args[1], requests.exceptions.RequestException)
 
     def test_forbid_private_methods(self):
@@ -177,17 +177,31 @@ class TestJSONRPCClient(TestCase):
     @responses.activate
     def test_calls(self):
         # rpc call with positional parameters:
-        responses.add(responses.POST, 'http://mock/xmlrpc',
-                      body='{"jsonrpc": "2.0", "result": 19, "id": 1}',
-                      content_type='application/json')
+        def callback1(request):
+            request_message = json.loads(request.body)
+            self.assertEqual(request_message["params"], [42, 23])
+            return (200, {}, u'{"jsonrpc": "2.0", "result": 19, "id": 1}')
+
+        responses.add_callback(
+            responses.POST, 'http://mock/xmlrpc',
+            content_type='application/json',
+            callback=callback1,
+        )
         self.assertEqual(self.server.subtract(42, 23), 19)
         responses.reset()
 
         # rpc call with named parameters
-        responses.add(responses.POST, 'http://mock/xmlrpc',
-                      body='{"jsonrpc": "2.0", "result": 19, "id": 3}',
-                      content_type='application/json')
-        self.assertEqual(self.server.subtract(42, 23), 19)
+        def callback2(request):
+            request_message = json.loads(request.body)
+            self.assertEqual(request_message["params"], {'y': 23, 'x': 42})
+            return (200, {}, u'{"jsonrpc": "2.0", "result": 19, "id": 1}')
+
+        responses.add_callback(
+            responses.POST, 'http://mock/xmlrpc',
+            content_type='application/json',
+            callback=callback2,
+        )
+        self.assertEqual(self.server.subtract(x=42, y=23), 19)
         responses.reset()
 
     @responses.activate
